@@ -13,6 +13,7 @@ func main() {
 	countFlag := getopt.BoolLong("count", 'c', "count rows")
 	headRows := getopt.IntLong("head", 'h', 0,"take the first n rows")
 	outFileName := getopt.StringLong("output", 'o', "", "write head/tail results to this file")
+	forceFlag := getopt.BoolLong("force", 'f', "force overwrite of output file")
 	versionFlag := getopt.BoolLong("version", 'v', "show version")
 
 	getopt.Parse()
@@ -57,7 +58,7 @@ func main() {
 
 		if *outFileName != "" {
 			_, err := os.Stat(*outFileName)
-			if os.IsExist(err) {
+			if os.IsExist(err) && !*forceFlag {
 				fmt.Fprintln(os.Stderr, "output file exists; overwrite with --force")
 				os.Exit(2)
 			}
