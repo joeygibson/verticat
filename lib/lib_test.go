@@ -23,7 +23,7 @@ func TestReadSignature(t *testing.T) {
 	}
 }
 
-func TestProcessFile(t *testing.T) {
+func TestCount(t *testing.T) {
 	file, err := os.Open("../../verticareader/private-data/4k/flow_stats-0-1550160360")
 	if err != nil {
 		t.Fatal("couldn't open file", err)
@@ -31,8 +31,14 @@ func TestProcessFile(t *testing.T) {
 
 	defer file.Close()
 
-	err = ProcessFile(file)
+	res, err := ProcessFile(file, true)
 	if err != nil {
 		t.Fatal("error processing file: ", err)
+	}
+
+	expected := 475
+
+	if res.(int) != expected {
+		t.Fatalf("wrong count; expected %d, got %d", expected, res.(int))
 	}
 }

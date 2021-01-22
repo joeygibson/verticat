@@ -34,29 +34,45 @@ func ReadSignature(file *os.File) (bool, error) {
 	return match, nil
 }
 
-func ProcessFile(file *os.File) error {
+func ProcessFile(file *os.File, countFlag bool) (interface{}, error) {
 	_, err := ReadSignature(file)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	definitions, err := ReadColumnDefinitions(file)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	var rowLen uint32
-	err = binary.Read(file, binary.LittleEndian, &rowLen)
+	result, err := iterateRows(file, definitions, countFlag)
 	if err != nil {
-		return err
+		return result, err
+	}
+	//
+	//switch t := result.(type) {
+	//case Count:
+	//	fmt.Printf("%d %s", t.Count, file.Name())
+	//}
+
+	return result, nil
+}
+
+func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool) (interface{}, error) {
+	count := 0
+
+	var rowLen uint32
+	err := binary.Read(file, binary.LittleEndian, &rowLen)
+	if err != nil {
+		return 0, err
 	}
 
 	for rowLen > 0 {
-		var data []byte
+		var row []byte
 
 		bitfield, err := ReadBitfield(file, definitions.NumberOfColumns)
 		if err != nil {
-			return err
+			return 0, err
 		}
 
 		nullValues := DecodeBitfield(bitfield)
@@ -71,7 +87,7 @@ func ProcessFile(file *os.File) error {
 			if width == math.MaxUint32 {
 				err = binary.Read(file, binary.LittleEndian, &columnWidth)
 				if err != nil {
-					return err
+					return 0, err
 				}
 			} else {
 				columnWidth = width
@@ -81,23 +97,32 @@ func ProcessFile(file *os.File) error {
 
 			err = binary.Read(file, binary.LittleEndian, &column)
 			if err != nil {
-				return err
+				return 0, err
 			}
 
-			data = append(data, column...)
+			row = append(row, column...)
 		}
+
+		if countFlag {
+			count += 1
+		}
+		//result = append(result, row...)
 
 		err = binary.Read(file, binary.LittleEndian, &rowLen)
 		if err != nil {
 			if err == io.EOF {
-				return nil
+				break
 			} else {
-				return err
+				return 0, err
 			}
 		}
 	}
 
-	return nil
+	if countFlag {
+		return count, nil
+	} else {
+		return -1, nil
+	}
 }
 
 func DecodeBitfield(bitfield []byte) []bool {
