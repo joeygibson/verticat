@@ -2,6 +2,7 @@ package lib
 
 import (
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -24,8 +25,7 @@ func TestReadSignature(t *testing.T) {
 }
 
 func TestCount(t *testing.T) {
-	//file, err := os.Open("../../verticareader/private-data/4k/flow_stats-0-1550160360")
-	file, err := os.Open("../xxx.bin")
+	file, err := os.Open("../private-data/sample")
 	if err != nil {
 		t.Fatal("couldn't open file", err)
 	}
@@ -46,33 +46,48 @@ func TestCount(t *testing.T) {
 }
 
 func TestHead(t *testing.T) {
-	file, err := os.Open("../../verticareader/private-data/4k/flow_stats-0-1550160360")
-	if err != nil {
-		t.Fatal("couldn't open file", err)
+	type args struct {
+		file      string
+		countFlag bool
+		headRows  int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    interface{}
+		wantErr bool
+	}{
+		{name: "all rows",
+			args:    args{file: "../private-data/sample", countFlag: false, headRows: 475},
+			want:    102728,
+			wantErr: false},
+		{name: "5 rows",
+			args:    args{file: "../private-data/sample", countFlag: false, headRows: 5},
+			want:    1102,
+			wantErr: false},
 	}
 
-	defer file.Close()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, err := os.Open(tt.args.file)
+			if err != nil {
+				t.Fatal("couldn't open file", err)
+			}
 
-	res, err := ProcessFile(file, false, 5)
-	if err != nil {
-		t.Fatal("error processing file: ", err)
+			defer file.Close()
+
+			got, err := ProcessFile(file, tt.args.countFlag, tt.args.headRows)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ProcessFile() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			fragment := got.(BinaryFileFragment)
+			actual := len(fragment.Data)
+
+			if !reflect.DeepEqual(actual, tt.want) {
+				t.Errorf("ProcessFile() got = %v, want %v", got, tt.want)
+			}
+		})
 	}
-
-	expected := 1102
-		//102728
-	fragment := res.(BinaryFileFragment)
-	actual := len(fragment.Data)
-
-	if actual != expected {
-		t.Fatalf("wrong byte count; expected %d, got %d", expected, actual)
-	}
-
-	file, err = os.Create("../xxx.bin")
-	if err != nil {
-		t.Fatal("error opening new file: ", err)
-	}
-
-	defer file.Close()
-
-	fragment.Write(file)
 }
