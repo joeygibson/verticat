@@ -2,6 +2,7 @@ package lib
 
 import (
 	"encoding/binary"
+	"io"
 	"os"
 )
 
@@ -11,6 +12,35 @@ type ColumnDefinitions struct {
 	Filler          byte
 	NumberOfColumns uint16
 	Widths          []uint32
+}
+
+func (c ColumnDefinitions) Write(file io.Writer) (err error) {
+	err = binary.Write(file, binary.LittleEndian, c.HeaderLength)
+	if err != nil {
+		return
+	}
+
+	err = binary.Write(file, binary.LittleEndian, c.Version)
+	if err != nil {
+		return
+	}
+
+	err = binary.Write(file, binary.LittleEndian, c.Filler)
+	if err != nil {
+		return
+	}
+
+	err = binary.Write(file, binary.LittleEndian, c.NumberOfColumns)
+	if err != nil {
+		return
+	}
+
+	err = binary.Write(file, binary.LittleEndian, c.Widths)
+	if err != nil {
+		return
+	}
+
+	return nil
 }
 
 func ReadColumnDefinitions(file *os.File) (ColumnDefinitions, error) {

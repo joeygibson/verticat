@@ -10,6 +10,11 @@ import (
 
 var FileSignature = []byte{0x4e, 0x41, 0x54, 0x49, 0x56, 0x45, 0x0a, 0xff, 0x0d, 0x0a, 0x00}
 
+type BinaryFileFragment struct {
+	Definitions ColumnDefinitions
+	Data        []byte
+}
+
 func ReadSignature(file *os.File) (bool, error) {
 	signature := make([]byte, len(FileSignature))
 
@@ -34,7 +39,26 @@ func ReadSignature(file *os.File) (bool, error) {
 	return match, nil
 }
 
-func ProcessFile(file *os.File, countFlag bool) (interface{}, error) {
+func (binaryFile *BinaryFileFragment) Write(file io.Writer) error {
+	_, err := file.Write(FileSignature)
+	if err != nil {
+		return err
+	}
+
+	err = binaryFile.Definitions.Write(file)
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Write(binaryFile.Data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ProcessFile(file *os.File, countFlag bool, headRows int) (interface{}, error) {
 	_, err := ReadSignature(file)
 	if err != nil {
 		return 0, err
@@ -45,21 +69,17 @@ func ProcessFile(file *os.File, countFlag bool) (interface{}, error) {
 		return 0, err
 	}
 
-	result, err := iterateRows(file, definitions, countFlag)
+	result, err := iterateRows(file, definitions, countFlag, headRows)
 	if err != nil {
 		return result, err
 	}
-	//
-	//switch t := result.(type) {
-	//case Count:
-	//	fmt.Printf("%d %s", t.Count, file.Name())
-	//}
 
 	return result, nil
 }
 
-func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool) (interface{}, error) {
+func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool, headRows int) (interface{}, error) {
 	count := 0
+	var data []byte
 
 	var rowLen uint32
 	err := binary.Read(file, binary.LittleEndian, &rowLen)
@@ -67,7 +87,13 @@ func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool) (
 		return 0, err
 	}
 
+	iteration := 0
+
 	for rowLen > 0 {
+		if headRows > 0 && iteration >= headRows {
+			break
+		}
+
 		var row []byte
 
 		bitfield, err := ReadBitfield(file, definitions.NumberOfColumns)
@@ -76,6 +102,13 @@ func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool) (
 		}
 
 		nullValues := DecodeBitfield(bitfield)
+
+		if headRows > 0 {
+			lenBytes := make([]byte, 4)
+			binary.LittleEndian.PutUint32(lenBytes, rowLen)
+			row = append(row, lenBytes...)
+			row = append(row, bitfield...)
+		}
 
 		for i, width := range definitions.Widths {
 			if nullValues[i] {
@@ -100,13 +133,20 @@ func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool) (
 				return 0, err
 			}
 
+			if width != columnWidth {
+				widthBytes := make([]byte, 4)
+				binary.LittleEndian.PutUint32(widthBytes, columnWidth)
+				row = append(row, widthBytes...)
+			}
+
 			row = append(row, column...)
 		}
 
 		if countFlag {
 			count += 1
+		} else if headRows > 0 {
+			data = append(data, row...)
 		}
-		//result = append(result, row...)
 
 		err = binary.Read(file, binary.LittleEndian, &rowLen)
 		if err != nil {
@@ -116,10 +156,18 @@ func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool) (
 				return 0, err
 			}
 		}
+
+		iteration += 1
 	}
 
 	if countFlag {
 		return count, nil
+	} else if headRows > 0 {
+		fragment := BinaryFileFragment{
+			Definitions: definitions,
+			Data:        data,
+		}
+		return fragment, nil
 	} else {
 		return -1, nil
 	}
