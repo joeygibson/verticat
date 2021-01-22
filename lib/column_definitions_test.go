@@ -6,7 +6,7 @@ import (
 )
 
 func TestReadColumnDefinitions(t *testing.T) {
-	file, err := os.Open("../private-data/sample")
+	file, err := os.Open("../test-data/sample")
 	if err != nil {
 		t.Fatal("couldn't open file", err)
 	}

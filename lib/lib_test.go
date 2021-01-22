@@ -7,7 +7,7 @@ import (
 )
 
 func TestReadSignature(t *testing.T) {
-	file, err := os.Open("../private-data/sample")
+	file, err := os.Open("../test-data/sample")
 	if err != nil {
 		t.Fatal("couldn't open file", err)
 	}
@@ -25,7 +25,7 @@ func TestReadSignature(t *testing.T) {
 }
 
 func TestCount(t *testing.T) {
-	file, err := os.Open("../private-data/sample")
+	file, err := os.Open("../test-data/sample")
 	if err != nil {
 		t.Fatal("couldn't open file", err)
 	}
@@ -59,11 +59,11 @@ func TestHead(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "all rows",
-			args:    args{file: "../private-data/sample", countFlag: false, headRows: 475, tailRows: 0},
+			args:    args{file: "../test-data/sample", countFlag: false, headRows: 475, tailRows: 0},
 			want:    102728,
 			wantErr: false},
 		{name: "5 rows",
-			args:    args{file: "../private-data/sample", countFlag: false, headRows: 5, tailRows: 0},
+			args:    args{file: "../test-data/sample", countFlag: false, headRows: 5, tailRows: 0},
 			want:    1102,
 			wantErr: false},
 	}
@@ -107,11 +107,11 @@ func TestTail(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "all rows",
-			args:    args{file: "../private-data/sample", countFlag: false, headRows: 0, tailRows: 475},
+			args:    args{file: "../test-data/sample", countFlag: false, headRows: 0, tailRows: 475},
 			want:    102728,
 			wantErr: false},
 		{name: "5 rows",
-			args:    args{file: "../private-data/sample", countFlag: false, headRows: 0, tailRows: 5},
+			args:    args{file: "../test-data/sample", countFlag: false, headRows: 0, tailRows: 5},
 			want:    1070,
 			wantErr: false},
 	}
