@@ -3,6 +3,7 @@ package lib
 import (
 	"encoding/binary"
 	"errors"
+	"io"
 	"math"
 	"os"
 )
@@ -46,6 +47,9 @@ func ProcessFile(file *os.File) error {
 
 	var rowLen uint32
 	err = binary.Read(file, binary.LittleEndian, &rowLen)
+	if err != nil {
+		return err
+	}
 
 	for rowLen > 0 {
 		var data []byte
@@ -57,7 +61,6 @@ func ProcessFile(file *os.File) error {
 
 		nullValues := DecodeBitfield(bitfield)
 
-		//for i := 0; i < definitions.NumberOfColumns; i++ {
 		for i, width := range definitions.Widths {
 			if nullValues[i] {
 				continue
@@ -75,12 +78,22 @@ func ProcessFile(file *os.File) error {
 			}
 
 			var column = make([]byte, columnWidth)
+
 			err = binary.Read(file, binary.LittleEndian, &column)
 			if err != nil {
 				return err
 			}
-			
+
 			data = append(data, column...)
+		}
+
+		err = binary.Read(file, binary.LittleEndian, &rowLen)
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			} else {
+				return err
+			}
 		}
 	}
 
@@ -90,8 +103,8 @@ func ProcessFile(file *os.File) error {
 func DecodeBitfield(bitfield []byte) []bool {
 	var nullValues []bool
 
-	for b := range bitfield {
-		for i := 8; i >= 0; i-- {
+	for _, b := range bitfield {
+		for i := 7; i >= 0; i-- {
 			isNull := b&(1<<i) != 0
 			nullValues = append(nullValues, isNull)
 		}

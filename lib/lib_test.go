@@ -22,3 +22,17 @@ func TestReadSignature(t *testing.T) {
 		t.Fatal("signature didn't match")
 	}
 }
+
+func TestProcessFile(t *testing.T) {
+	file, err := os.Open("../../verticareader/private-data/4k/flow_stats-0-1550160360")
+	if err != nil {
+		t.Fatal("couldn't open file", err)
+	}
+
+	defer file.Close()
+
+	err = ProcessFile(file)
+	if err != nil {
+		t.Fatal("error processing file: ", err)
+	}
+}
