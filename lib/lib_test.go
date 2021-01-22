@@ -6,7 +6,7 @@ import (
 )
 
 func TestReadSignature(t *testing.T) {
-	file, err := os.Open("../private-data/flow_stats-0-1550160360")
+	file, err := os.Open("../private-data/sample")
 	if err != nil {
 		t.Fatal("couldn't open file", err)
 	}

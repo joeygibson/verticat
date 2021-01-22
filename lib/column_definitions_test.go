@@ -1,13 +1,12 @@
 package lib
 
 import (
-	"fmt"
 	"os"
 	"testing"
 )
 
 func TestReadColumnDefinitions(t *testing.T) {
-	file, err := os.Open("../private-data/flow_stats-0-1550160360")
+	file, err := os.Open("../private-data/sample")
 	if err != nil {
 		t.Fatal("couldn't open file", err)
 	}
@@ -28,5 +27,20 @@ func TestReadColumnDefinitions(t *testing.T) {
 		t.Fatal("error reading column definitions: ", err)
 	}
 
-	fmt.Println(definitions)
+	if definitions.HeaderLength != 305 {
+		t.Errorf("wrong header length: %d", definitions.HeaderLength)
+	}
+
+	if definitions.Version != 1 {
+		t.Errorf("wrong version: %d", definitions.Version)
+	}
+
+	if definitions.NumberOfColumns != 75 {
+		t.Errorf("wrong column count: %d", definitions.NumberOfColumns)
+	}
+
+	if len(definitions.Widths) != int(definitions.NumberOfColumns) {
+		t.Errorf("wrong column count: %d != %d", len(definitions.Widths),
+			definitions.NumberOfColumns)
+	}
 }
