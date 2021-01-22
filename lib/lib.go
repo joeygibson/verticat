@@ -58,7 +58,7 @@ func (binaryFile *BinaryFileFragment) Write(file io.Writer) error {
 	return nil
 }
 
-func ProcessFile(file *os.File, countFlag bool, headRows int) (interface{}, error) {
+func ProcessFile(file *os.File, countFlag bool, headRows int, tailRows int) (interface{}, error) {
 	_, err := ReadSignature(file)
 	if err != nil {
 		return 0, err
@@ -69,7 +69,7 @@ func ProcessFile(file *os.File, countFlag bool, headRows int) (interface{}, erro
 		return 0, err
 	}
 
-	result, err := iterateRows(file, definitions, countFlag, headRows)
+	result, err := iterateRows(file, definitions, countFlag, headRows, tailRows)
 	if err != nil {
 		return result, err
 	}
@@ -77,9 +77,33 @@ func ProcessFile(file *os.File, countFlag bool, headRows int) (interface{}, erro
 	return result, nil
 }
 
-func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool, headRows int) (interface{}, error) {
+func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool,
+	headRows int, tailRows int) (interface{}, error) {
 	count := 0
 	var data []byte
+
+	if tailRows > 0 {
+		pos, err := file.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return 0, err
+		}
+
+		result, err := iterateRows(file, definitions, true, 0, 0)
+		if err != nil {
+			return 0, err
+		}
+
+		count = result.(int)
+
+		curPos, err := file.Seek(pos, io.SeekStart)
+		if err != nil {
+			return 0, err
+		}
+
+		if curPos != pos {
+			return 0, errors.New("error resetting file position")
+		}
+	}
 
 	var rowLen uint32
 	err := binary.Read(file, binary.LittleEndian, &rowLen)
@@ -103,7 +127,7 @@ func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool, h
 
 		nullValues := DecodeBitfield(bitfield)
 
-		if headRows > 0 {
+		if headRows > 0 || (tailRows > 0 && iteration >= (count-tailRows)) {
 			lenBytes := make([]byte, 4)
 			binary.LittleEndian.PutUint32(lenBytes, rowLen)
 			row = append(row, lenBytes...)
@@ -144,7 +168,7 @@ func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool, h
 
 		if countFlag {
 			count += 1
-		} else if headRows > 0 {
+		} else if headRows > 0 || (tailRows > 0 && iteration >= (count-tailRows)) {
 			data = append(data, row...)
 		}
 
@@ -162,7 +186,7 @@ func iterateRows(file *os.File, definitions ColumnDefinitions, countFlag bool, h
 
 	if countFlag {
 		return count, nil
-	} else if headRows > 0 {
+	} else if headRows > 0 || tailRows > 0 {
 		fragment := BinaryFileFragment{
 			Definitions: definitions,
 			Data:        data,

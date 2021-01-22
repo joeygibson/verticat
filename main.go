@@ -11,7 +11,8 @@ import (
 func main() {
 	helpFlag := getopt.BoolLong("help", 'H', "show help")
 	countFlag := getopt.BoolLong("count", 'c', "count rows")
-	headRows := getopt.IntLong("head", 'h', 0,"take the first n rows")
+	headRows := getopt.IntLong("head", 'h', 0, "take the first n rows")
+	tailRows := getopt.IntLong("tail", 't', 0, "take the last n rows")
 	outFileName := getopt.StringLong("output", 'o', "", "write head/tail results to this file")
 	forceFlag := getopt.BoolLong("force", 'f', "force overwrite of output file")
 	versionFlag := getopt.BoolLong("version", 'v', "show version")
@@ -42,7 +43,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	result, err := lib.ProcessFile(inFile, *countFlag, *headRows)
+	result, err := lib.ProcessFile(inFile, *countFlag, *headRows, *tailRows)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error processing file: ", err)
 		os.Exit(1)
@@ -51,14 +52,14 @@ func main() {
 	if *countFlag {
 		count := result.(int)
 		fmt.Printf("%d %s\n", count, args[0])
-	} else if *headRows > 0 {
+	} else if *headRows > 0 || *tailRows > 0 {
 		fragment := result.(lib.BinaryFileFragment)
 
 		var output io.Writer
 
 		if *outFileName != "" {
 			_, err := os.Stat(*outFileName)
-			if os.IsExist(err) && !*forceFlag {
+			if !os.IsNotExist(err) && !*forceFlag {
 				fmt.Fprintln(os.Stderr, "output file exists; overwrite with --force")
 				os.Exit(2)
 			}
@@ -75,6 +76,10 @@ func main() {
 			output = os.Stdout
 		}
 
-		fragment.Write(output)
+		err = fragment.Write(output)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error writing new file: ", err)
+			os.Exit(2)
+		}
 	}
 }

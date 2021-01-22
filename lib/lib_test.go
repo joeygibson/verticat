@@ -32,7 +32,7 @@ func TestCount(t *testing.T) {
 
 	defer file.Close()
 
-	res, err := ProcessFile(file, true, 0)
+	res, err := ProcessFile(file, true, 0, 0)
 	if err != nil {
 		t.Fatal("error processing file: ", err)
 	}
@@ -50,6 +50,7 @@ func TestHead(t *testing.T) {
 		file      string
 		countFlag bool
 		headRows  int
+		tailRows  int
 	}
 	tests := []struct {
 		name    string
@@ -58,11 +59,11 @@ func TestHead(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "all rows",
-			args:    args{file: "../private-data/sample", countFlag: false, headRows: 475},
+			args:    args{file: "../private-data/sample", countFlag: false, headRows: 475, tailRows: 0},
 			want:    102728,
 			wantErr: false},
 		{name: "5 rows",
-			args:    args{file: "../private-data/sample", countFlag: false, headRows: 5},
+			args:    args{file: "../private-data/sample", countFlag: false, headRows: 5, tailRows: 0},
 			want:    1102,
 			wantErr: false},
 	}
@@ -76,7 +77,7 @@ func TestHead(t *testing.T) {
 
 			defer file.Close()
 
-			got, err := ProcessFile(file, tt.args.countFlag, tt.args.headRows)
+			got, err := ProcessFile(file, tt.args.countFlag, tt.args.headRows, tt.args.tailRows)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ProcessFile() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -86,7 +87,55 @@ func TestHead(t *testing.T) {
 			actual := len(fragment.Data)
 
 			if !reflect.DeepEqual(actual, tt.want) {
-				t.Errorf("ProcessFile() got = %v, want %v", got, tt.want)
+				t.Errorf("ProcessFile() got = %v, want %v", actual, tt.want)
+			}
+		})
+	}
+}
+
+func TestTail(t *testing.T) {
+	type args struct {
+		file      string
+		countFlag bool
+		headRows  int
+		tailRows  int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    interface{}
+		wantErr bool
+	}{
+		{name: "all rows",
+			args:    args{file: "../private-data/sample", countFlag: false, headRows: 0, tailRows: 475},
+			want:    102728,
+			wantErr: false},
+		{name: "5 rows",
+			args:    args{file: "../private-data/sample", countFlag: false, headRows: 0, tailRows: 5},
+			want:    1070,
+			wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, err := os.Open(tt.args.file)
+			if err != nil {
+				t.Fatal("couldn't open file", err)
+			}
+
+			defer file.Close()
+
+			got, err := ProcessFile(file, tt.args.countFlag, tt.args.headRows, tt.args.tailRows)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ProcessFile() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			fragment := got.(BinaryFileFragment)
+			actual := len(fragment.Data)
+
+			if !reflect.DeepEqual(actual, tt.want) {
+				t.Errorf("ProcessFile() got = %v, want %v", actual, tt.want)
 			}
 		})
 	}
