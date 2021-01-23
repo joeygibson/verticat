@@ -8,6 +8,12 @@ import (
 	"os"
 )
 
+var (
+	gitTag    string // Git tag
+	sha1ver   string // sha1 revision used to build the program
+	buildTime string // when the executable was built
+)
+
 func main() {
 	helpFlag := getopt.BoolLong("help", 'H', "show help")
 	countFlag := getopt.BoolLong("count", 'c', "count rows")
@@ -17,17 +23,25 @@ func main() {
 	forceFlag := getopt.BoolLong("force", 'f', "force overwrite of output file")
 	versionFlag := getopt.BoolLong("version", 'v', "show version")
 
+	getopt.SetParameters("<file>")
 	getopt.Parse()
 	args := getopt.Args()
 
 	if *helpFlag {
-		fmt.Println("Help!")
 		getopt.PrintUsage(os.Stderr)
 		os.Exit(0)
 	}
 
 	if *versionFlag {
-		fmt.Println("Version!")
+		var msg string
+
+		if gitTag != "" {
+			msg = fmt.Sprintf("%s - %s - %s", gitTag, sha1ver, buildTime)
+		} else {
+			msg = fmt.Sprintf("%s - %s", sha1ver, buildTime)
+		}
+
+		fmt.Println(msg)
 		os.Exit(0)
 	}
 
