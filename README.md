@@ -8,7 +8,7 @@ A tool to count the rows, and take rows from  [Vertica native binary files](http
 ## Usage
 
 ```bash
-Usage: verticat [-cfHv] [-h value] [-o value] [-t value] [parameters ...]
+Usage: verticat [-cfHv] [-h value] [-o value] [-t value] <file>
  -c, --count       count rows
  -f, --force       force overwrite of output file
  -h, --head=value  take the first n rows

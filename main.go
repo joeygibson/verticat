@@ -25,6 +25,7 @@ func main() {
 
 	getopt.SetParameters("<file>")
 	getopt.Parse()
+
 	args := getopt.Args()
 
 	if *helpFlag {
@@ -46,7 +47,13 @@ func main() {
 	}
 
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(os.Stderr, "no file given")
+		_, _ = fmt.Fprintf(os.Stderr, "Error: no file given\n\n")
+		getopt.PrintUsage(os.Stderr)
+		os.Exit(1)
+	}
+
+	if *headRows > 0 && *tailRows > 0 {
+		fmt.Fprintf(os.Stderr, "Error: --head and --tail are mutually exclusive\n\n")
 		getopt.PrintUsage(os.Stderr)
 		os.Exit(1)
 	}
