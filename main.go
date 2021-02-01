@@ -23,20 +23,22 @@ func main() {
 	forceFlag := getopt.BoolLong("force", 'f', "force overwrite of output file")
 	versionFlag := getopt.BoolLong("version", 'v', "show version")
 
-	getopt.SetParameters("<file>")
+	getopt.SetParameters("<file1> [file...]")
 	getopt.Parse()
 
 	args := getopt.Args()
 
 	if *helpFlag {
-		getopt.PrintUsage(os.Stderr)
+		printUsage()
 		os.Exit(0)
 	}
 
 	if *versionFlag {
 		var msg string
 
-		if gitTag != "" {
+		if gitTag == "" && sha1ver == "" && buildTime == "" {
+			msg = "development version"
+		} else if gitTag != "" {
 			msg = fmt.Sprintf("%s - %s - %s", gitTag, sha1ver, buildTime)
 		} else {
 			msg = fmt.Sprintf("%s - %s", sha1ver, buildTime)
@@ -46,61 +48,95 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(args) == 0 {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: no file given\n\n")
-		getopt.PrintUsage(os.Stderr)
-		os.Exit(1)
-	}
-
 	if *headRows > 0 && *tailRows > 0 {
 		fmt.Fprintf(os.Stderr, "Error: --head and --tail are mutually exclusive\n\n")
-		getopt.PrintUsage(os.Stderr)
+		printUsage()
 		os.Exit(1)
 	}
 
-	inFile, err := os.Open(args[0])
-	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "error opening file: ", err)
-		os.Exit(2)
-	}
+	var inputFiles []*os.File
 
-	result, err := lib.ProcessFile(inFile, *countFlag, *headRows, *tailRows)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "error processing file: ", err)
-		os.Exit(1)
+	if len(args) == 0 {
+		inputFiles = append(inputFiles, os.Stdin)
+	} else {
+		for _, fileName := range args {
+			inFile, err := os.Open(fileName)
+			if err != nil {
+				_, _ = fmt.Fprintln(os.Stderr, "error opening file: ", err)
+				os.Exit(2)
+			}
+
+			defer inFile.Close()
+
+			inputFiles = append(inputFiles, inFile)
+		}
 	}
 
 	if *countFlag {
-		count := result.(int)
-		fmt.Printf("%d %s\n", count, args[0])
-	} else if *headRows > 0 || *tailRows > 0 {
-		fragment := result.(lib.BinaryFileFragment)
-
-		var output io.Writer
-
-		if *outFileName != "" {
-			_, err := os.Stat(*outFileName)
-			if !os.IsNotExist(err) && !*forceFlag {
-				fmt.Fprintln(os.Stderr, "output file exists; overwrite with --force")
-				os.Exit(2)
-			}
-
-			file, err := os.Create(*outFileName)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "error opening new file: ", err)
-				os.Exit(2)
-			}
-
-			defer file.Close()
-			output = file
-		} else {
-			output = os.Stdout
-		}
-
-		err = fragment.Write(output)
+		err := lib.CountRows(inputFiles)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "error writing new file: ", err)
+			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)
 		}
+
+		os.Exit(0)
 	}
+
+	var output io.Writer
+
+	if *outFileName != "" {
+		_, err := os.Stat(*outFileName)
+		if !os.IsNotExist(err) && !*forceFlag {
+			fmt.Fprintln(os.Stderr, "output file exists; overwrite with --force")
+			os.Exit(2)
+		}
+
+		file, err := os.Create(*outFileName)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error opening new file: ", err)
+			os.Exit(2)
+		}
+
+		defer file.Close()
+		output = file
+	} else {
+		output = os.Stdout
+	}
+
+	firstTime := true
+
+	for _, inputFile := range inputFiles {
+		if *headRows != 0 {
+			err := lib.Head(inputFile, output, *headRows, firstTime)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "error processing file: ", err)
+				os.Exit(1)
+			}
+		} else if *tailRows != 0 {
+			err := lib.Tail(inputFile, output, *tailRows, firstTime)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "error processing file: ", err)
+				os.Exit(1)
+			}
+		} else {
+			err := lib.Cat(inputFile, output, firstTime)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "error processing file: ", err)
+				os.Exit(1)
+			}
+		}
+
+		firstTime = false
+	}
+}
+
+func printUsage() {
+	getopt.PrintUsage(os.Stderr)
+	fmt.Fprintln(os.Stderr, "\nIf --head or --tail are used with multiple files, that many rows")
+	fmt.Fprintln(os.Stderr, "will be taken from each file, and written to the output.")
+	fmt.Fprintln(os.Stderr, "\nIf operating on multiple files, they must all share the same column layout.")
+	fmt.Fprintln(os.Stderr, "\nWith no options passed, verticat acts like the standard cat program,")
+	fmt.Fprintln(os.Stderr, "reading from stdin if no files are given. Since Vertica native files")
+	fmt.Fprintln(os.Stderr, "start with a metadata header, if you want to cat multiple files together,")
+	fmt.Fprintln(os.Stderr, "specify them as arguments to verticat itself.")
 }
