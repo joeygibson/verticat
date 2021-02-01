@@ -23,7 +23,7 @@ func main() {
 	forceFlag := getopt.BoolLong("force", 'f', "force overwrite of output file")
 	versionFlag := getopt.BoolLong("version", 'v', "show version")
 
-	getopt.SetParameters("<file1> [file...]")
+	getopt.SetParameters("[file...]")
 	getopt.Parse()
 
 	args := getopt.Args()

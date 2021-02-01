@@ -10,7 +10,7 @@ from  [Vertica native binary files](https://www.vertica.com/docs/9.3.x/HTML/Cont
 ## Usage
 
 ```bash
-Usage: verticat [-cfHv] [-h value] [-o value] [-t value] <file1> [file...]
+Usage: verticat [-cfHv] [-h value] [-o value] [-t value] [file...]
  -c, --count       count rows
  -f, --force       force overwrite of output file
  -h, --head=value  take the first n rows
