@@ -57,6 +57,12 @@ func main() {
 	var inputFiles []*os.File
 
 	if len(args) == 0 {
+		if *tailRows > 0 {
+			fmt.Fprintf(os.Stderr, "Error: --tail doesn't work when reading from stdin.\n\n")
+			printUsage()
+			os.Exit(1)
+		}
+
 		inputFiles = append(inputFiles, os.Stdin)
 	} else {
 		for _, fileName := range args {

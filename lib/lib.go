@@ -161,11 +161,6 @@ func countRows(file *os.File) (int, error) {
 	}
 	count := 0
 
-	pos, err := file.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return count, err
-	}
-
 	_, err = readRow(file, definitions)
 
 	for err == nil {
@@ -177,8 +172,6 @@ func countRows(file *os.File) (int, error) {
 	if err == io.EOF {
 		err = nil
 	}
-
-	err = resetFilePosition(file, pos)
 
 	return count, err
 }
@@ -316,114 +309,6 @@ func writeMetaData(shouldWrite bool, writer io.Writer, definitions ColumnDefinit
 
 	return nil
 }
-
-//func iterateRows(file *os.File, outFile *os.File, definitions ColumnDefinitions, countFlag bool,
-//	headRows int, tailRows int) error {
-//	count := 0
-//
-//	if tailRows > 0 {
-//		pos, err := file.Seek(0, io.SeekCurrent)
-//		if err != nil {
-//			return err
-//		}
-//
-//		err := iterateRows(file, outFile, definitions, true, 0, 0)
-//
-//		count = result.(int)
-//
-//		curPos, err := file.Seek(pos, io.SeekStart)
-//		if err != nil {
-//			return err
-//		}
-//
-//		if curPos != pos {
-//			return 0, errors.New("error resetting file position")
-//		}
-//	}
-//
-//	var rowLen uint32
-//	err := binary.Read(file, binary.LittleEndian, &rowLen)
-//	if err != nil {
-//		return 0, err
-//	}
-//
-//	iteration := 0
-//
-//	for rowLen > 0 {
-//		if headRows > 0 && iteration >= headRows {
-//			break
-//		}
-//
-//		var row []byte
-//
-//		bitfield, err := ReadBitfield(file, definitions.NumberOfColumns)
-//		if err != nil {
-//			return 0, err
-//		}
-//
-//		nullValues := DecodeBitfield(bitfield)
-//
-//		if headRows > 0 || (tailRows > 0 && iteration >= (count-tailRows)) {
-//			lenBytes := make([]byte, 4)
-//			binary.LittleEndian.PutUint32(lenBytes, rowLen)
-//			row = append(row, lenBytes...)
-//			row = append(row, bitfield...)
-//		}
-//
-//		for i, width := range definitions.Widths {
-//			if nullValues[i] {
-//				continue
-//			}
-//
-//			var columnWidth uint32
-//
-//			if width == math.MaxUint32 {
-//				err = binary.Read(file, binary.LittleEndian, &columnWidth)
-//				if err != nil {
-//					return 0, err
-//				}
-//			} else {
-//				columnWidth = width
-//			}
-//
-//			var column = make([]byte, columnWidth)
-//
-//			err = binary.Read(file, binary.LittleEndian, &column)
-//			if err != nil {
-//				return 0, err
-//			}
-//
-//			if width != columnWidth {
-//				widthBytes := make([]byte, 4)
-//				binary.LittleEndian.PutUint32(widthBytes, columnWidth)
-//				row = append(row, widthBytes...)
-//			}
-//
-//			row = append(row, column...)
-//		}
-//
-//		if countFlag {
-//			count += 1
-//		} else if headRows > 0 || (tailRows > 0 && iteration >= (count-tailRows)) {
-//			outFile.Write(row)
-//		}
-//
-//		err = binary.Read(file, binary.LittleEndian, &rowLen)
-//		if err != nil {
-//			if err == io.EOF {
-//				break
-//			} else {
-//				return 0, err
-//			}
-//		}
-//
-//		iteration += 1
-//	}
-//
-//	if countFlag {
-//		fmt.Printf("%d %s\n", count, file.Name())
-//	}
-//}
 
 func DecodeBitfield(bitfield []byte) []bool {
 	var nullValues []bool
