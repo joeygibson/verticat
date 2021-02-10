@@ -22,6 +22,7 @@ func main() {
 	outFileName := getopt.StringLong("output", 'o', "", "write head/tail results to this file")
 	forceFlag := getopt.BoolLong("force", 'f', "force overwrite of output file")
 	versionFlag := getopt.BoolLong("version", 'v', "show version")
+	printHeaderFlag := getopt.BoolLong("print-header", 'p', "print out header and exit")
 
 	getopt.SetParameters("[file...]")
 	getopt.Parse()
@@ -124,6 +125,13 @@ func main() {
 				fmt.Fprintln(os.Stderr, "error processing file: ", err)
 				os.Exit(1)
 			}
+		} else if *printHeaderFlag {
+			err := lib.PrintHeader(inputFile, output)
+
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "error processing file: ", err)
+				os.Exit(1)
+			}
 		} else {
 			err := lib.Cat(inputFile, output, firstTime)
 			if err != nil {
@@ -145,4 +153,6 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "reading from stdin if no files are given. Since Vertica native files")
 	fmt.Fprintln(os.Stderr, "start with a metadata header, if you want to cat multiple files together,")
 	fmt.Fprintln(os.Stderr, "specify them as arguments to verticat itself.")
+	fmt.Fprintln(os.Stderr, "\nThe -print-header outputs just the column widths for each file. This might")
+	fmt.Fprintln(os.Stderr, "be useful in determining what an unknown file contains.")
 }

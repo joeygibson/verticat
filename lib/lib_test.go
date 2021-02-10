@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -46,40 +47,62 @@ func TestCount(t *testing.T) {
 	}
 }
 
-//func TestCat(t *testing.T) {
-//	file, err := os.Open("../test-data/sample")
-//	if err != nil {
-//		t.Fatal("couldn't open file", err)
-//	}
-//
-//	fileInfo, _ := file.Stat()
-//	fileInfo.Size()
-//
-//	defer file.Close()
-//
-//	var buf bytes.Buffer
-//
-//	err = Cat(file, &buf, true)
-//	if err != nil {
-//		t.Fatal("error reading rows", err)
-//	}
-//
-//	fullLen := buf.Len()
-//
-//	resetFilePosition(file, 0)
-//	buf.Reset()
-//
-//	err = Cat(file, &buf, false)
-//	if err != nil {
-//		t.Fatal("error reading rows", err)
-//	}
-//
-//	noMetaLen := buf.Len()
-//
-//	if fullLen == noMetaLen {
-//		t.Fatal("lengths should differ")
-//	}
-//}
+func TestPrintHeader(t *testing.T) {
+	tests := []struct {
+		name    string
+		file    string
+		wantLen int
+		want    []string
+		wantErr bool
+	}{
+		{name: "all-types file",
+			file:    "../test-data/all-types.bin",
+			wantLen: 14,
+			want:    []string{"8", "8", "10", "-1", "1", "8", "8", "8", "8", "8", "-1", "3", "24", "8"},
+			wantErr: false},
+		{name: "sample file",
+			file:    "../test-data/sample",
+			wantLen: 75,
+			want: []string{"8", "8", "8", "4", "8", "8", "8", "8", "-1", "4", "-1", "8", "-1", "4",
+				"-1", "8", "-1", "4", "4", "4", "8", "-1", "-1", "4", "4", "8", "8", "4", "4", "4", "4",
+				"-1", "-1", "4", "4", "8", "8", "4", "4", "4", "4", "4", "4", "8", "8", "-1", "-1", "-1",
+				"4", "-1", "4", "-1", "4", "4", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1", "-1",
+				"-1", "-1", "-1", "-1", "2", "2", "2", "2", "4", "4", "1"},
+			wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, err := os.Open(tt.file)
+			if err != nil {
+				t.Fatal("couldn't open file", err)
+			}
+
+			defer file.Close()
+
+			var buf bytes.Buffer
+
+			err = PrintHeader(file, &buf)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PrintHeader() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			outStr := strings.TrimSpace(buf.String())
+			chunks := strings.Split(outStr, "\n")
+
+			if len(chunks) != tt.wantLen {
+				t.Errorf("wrong number of fields; got = %v, want %v", len(chunks), tt.wantLen)
+			}
+
+			for i, exp := range tt.want {
+				if exp != chunks[i] {
+					t.Errorf("PrintHeader() got = %v, want %v", chunks[i], exp)
+				}
+			}
+		})
+	}
+}
 
 func TestHead(t *testing.T) {
 	type args struct {

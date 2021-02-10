@@ -198,6 +198,34 @@ func Cat(file *os.File, writer io.Writer, shouldWriteMetaData bool) error {
 	return nil
 }
 
+func PrintHeader(file *os.File, writer io.Writer) error {
+	valid, err := ReadSignature(file)
+	if err != nil {
+		return err
+	}
+
+	if !valid {
+		return errors.New(fmt.Sprintf("invalid file signature: %s", file.Name()))
+	}
+
+	definitions, err := ReadColumnDefinitions(file)
+	if err != nil {
+		return err
+	}
+
+	for _, width := range definitions.Widths {
+		if width == math.MaxUint32 {
+			fmt.Fprintln(writer, -1)
+		} else {
+			fmt.Fprintln(writer, width)
+		}
+	}
+
+	fmt.Fprintf(writer, "\n")
+
+	return nil
+}
+
 func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData bool) error {
 	valid, err := ReadSignature(file)
 	if err != nil {
