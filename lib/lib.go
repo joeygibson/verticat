@@ -60,44 +60,27 @@ func (binaryFile *BinaryFileFragment) Write(file io.Writer, writeHeaders bool) e
 	return nil
 }
 
-//func ProcessFile(file *os.File, outFile *os.File, countFlag bool, headRows int, tailRows int) (interface{}, error) {
-//	_, err := ReadSignature(file)
-//	if err != nil {
-//		return 0, err
-//	}
-//
-//	definitions, err := ReadColumnDefinitions(file)
-//	if err != nil {
-//		return 0, err
-//	}
-//
-//	result, err := iterateRows(file, outFile, definitions, countFlag, headRows, tailRows)
-//	if err != nil {
-//		return result, err
-//	}
-//
-//	return result, nil
-//}
+func readRow(file *os.File, definitions ColumnDefinitions, newColumnOrder []uint) ([]byte, error) {
+	var flatRow []byte
+	row := make([][]byte, definitions.NumberOfColumns)
 
-func readRow(file *os.File, definitions ColumnDefinitions) ([]byte, error) {
-	var row []byte
 	var rowLen uint32
 	err := binary.Read(file, binary.LittleEndian, &rowLen)
 	if err != nil {
-		return row, err
+		return flatRow, err
 	}
 
 	bitfield, err := ReadBitfield(file, definitions.NumberOfColumns)
 	if err != nil {
-		return row, err
+		return flatRow, err
 	}
 
 	nullValues := DecodeBitfield(bitfield)
 
 	lenBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(lenBytes, rowLen)
-	row = append(row, lenBytes...)
-	row = append(row, bitfield...)
+	flatRow = append(flatRow, lenBytes...)
+	flatRow = append(flatRow, bitfield...)
 
 	for i, width := range definitions.Widths {
 		if nullValues[i] {
@@ -109,7 +92,7 @@ func readRow(file *os.File, definitions ColumnDefinitions) ([]byte, error) {
 		if width == math.MaxUint32 {
 			err = binary.Read(file, binary.LittleEndian, &columnWidth)
 			if err != nil {
-				return row, err
+				return flatRow, err
 			}
 		} else {
 			columnWidth = width
@@ -119,19 +102,32 @@ func readRow(file *os.File, definitions ColumnDefinitions) ([]byte, error) {
 
 		err = binary.Read(file, binary.LittleEndian, &column)
 		if err != nil {
-			return row, err
+			return flatRow, err
+		}
+
+		var rowPos uint
+
+		if newColumnOrder != nil {
+			rowPos = newColumnOrder[i] - 1
+		} else {
+			rowPos = uint(i)
 		}
 
 		if width != columnWidth {
 			widthBytes := make([]byte, 4)
 			binary.LittleEndian.PutUint32(widthBytes, columnWidth)
-			row = append(row, widthBytes...)
+			row[rowPos] = widthBytes
+			row[rowPos] = append(row[rowPos], column...)
+		} else {
+			row[rowPos] = column
 		}
-
-		row = append(row, column...)
 	}
 
-	return row, nil
+	for _, column := range row {
+		flatRow = append(flatRow, column...)
+	}
+
+	return flatRow, nil
 }
 
 func CountRows(inputFiles []*os.File) error {
@@ -161,12 +157,12 @@ func countRows(file *os.File) (int, error) {
 	}
 	count := 0
 
-	_, err = readRow(file, definitions)
+	_, err = readRow(file, definitions, nil)
 
 	for err == nil {
 		count += 1
 
-		_, err = readRow(file, definitions)
+		_, err = readRow(file, definitions, nil)
 	}
 
 	if err == io.EOF {
@@ -189,8 +185,8 @@ func resetFilePosition(file *os.File, pos int64) error {
 	return nil
 }
 
-func Cat(file *os.File, writer io.Writer, shouldWriteMetaData bool) error {
-	err := Head(file, writer, math.MaxInt64, shouldWriteMetaData)
+func Cat(file *os.File, writer io.Writer, shouldWriteMetaData bool, newColumnOrder []uint) error {
+	err := Head(file, writer, math.MaxInt64, shouldWriteMetaData, newColumnOrder)
 	if err != nil {
 		return err
 	}
@@ -226,7 +222,8 @@ func PrintHeader(file *os.File, writer io.Writer) error {
 	return nil
 }
 
-func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData bool) error {
+func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData bool,
+	newColumnOrder []uint) error {
 	valid, err := ReadSignature(file)
 	if err != nil {
 		return err
@@ -249,7 +246,7 @@ func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 	i := 0
 
 	for i < rowsToTake {
-		row, err := readRow(file, definitions)
+		row, err := readRow(file, definitions, newColumnOrder)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -304,7 +301,7 @@ func Tail(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 	i := 0
 
 	for i < totalRows {
-		row, err := readRow(file, definitions)
+		row, err := readRow(file, definitions, nil)
 		if err != nil {
 			return err
 		}

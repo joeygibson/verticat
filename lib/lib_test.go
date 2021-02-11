@@ -2,6 +2,7 @@ package lib
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -145,7 +146,7 @@ func TestHead(t *testing.T) {
 
 			var buf bytes.Buffer
 
-			err = Head(file, &buf, tt.args.rowsToTake, tt.args.shouldWriteMetaData)
+			err = Head(file, &buf, tt.args.rowsToTake, tt.args.shouldWriteMetaData, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Head() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -215,6 +216,59 @@ func TestTail(t *testing.T) {
 	}
 }
 
+func TestCatWithReorder(t *testing.T) {
+	tests := []struct {
+		name           string
+		fileName       string
+		newColumnOrder []uint
+		shouldDiffer   bool
+	}{
+		{name: "no reordering, empty slice",
+			fileName:       "../test-data/all-types.bin",
+			newColumnOrder: nil,
+			shouldDiffer:   false},
+		{name: "no reordering",
+			fileName:       "../test-data/all-types.bin",
+			newColumnOrder: []uint{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
+			shouldDiffer:   false},
+		{name: "reorder",
+			fileName:       "../test-data/all-types.bin",
+			newColumnOrder: []uint{1, 14, 2, 3, 4, 10, 5, 6, 7, 8, 9, 11, 12, 13},
+			shouldDiffer:   true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, err := os.Open(tt.fileName)
+			if err != nil {
+				t.Fatal("couldn't open file", err)
+			}
+
+			defer file.Close()
+
+			var buf bytes.Buffer
+
+			err = Cat(file, &buf, true, tt.newColumnOrder)
+			if err != nil {
+				t.Fatal("error processing input file with reordering: ", err)
+			}
+
+			_, _ = file.Seek(0, io.SeekStart)
+
+			var origOrderBuf bytes.Buffer
+
+			err = Cat(file, &origOrderBuf, true, nil)
+			if err != nil {
+				t.Fatal("error processing input file with original ordering: ", err)
+			}
+
+			if reflect.DeepEqual(buf, origOrderBuf) && tt.shouldDiffer {
+				t.Errorf("output should differ, but did not")
+			}
+		})
+	}
+}
+
 func TestCat(t *testing.T) {
 	type args struct {
 		file                string
@@ -247,7 +301,7 @@ func TestCat(t *testing.T) {
 
 			var buf bytes.Buffer
 
-			err = Cat(file, &buf, tt.args.shouldWriteMetaData)
+			err = Cat(file, &buf, tt.args.shouldWriteMetaData, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Tail() error = %v, wantErr %v", err, tt.wantErr)
 				return
