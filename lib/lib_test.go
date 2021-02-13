@@ -233,7 +233,7 @@ func TestCatWithReorder(t *testing.T) {
 			shouldDiffer:   false},
 		{name: "reorder",
 			fileName:       "../test-data/all-types.bin",
-			newColumnOrder: []uint{1, 14, 2, 3, 4, 10, 5, 6, 7, 8, 9, 11, 12, 13},
+			newColumnOrder: []uint{2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
 			shouldDiffer:   true},
 	}
 

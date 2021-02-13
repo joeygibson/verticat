@@ -60,7 +60,7 @@ func (binaryFile *BinaryFileFragment) Write(file io.Writer, writeHeaders bool) e
 	return nil
 }
 
-func readRow(file *os.File, definitions ColumnDefinitions, newColumnOrder []uint) ([]byte, error) {
+func readRow(file *os.File, definitions ColumnDefinitions) ([]byte, error) {
 	var flatRow []byte
 	row := make([][]byte, definitions.NumberOfColumns)
 
@@ -77,10 +77,12 @@ func readRow(file *os.File, definitions ColumnDefinitions, newColumnOrder []uint
 
 	nullValues := DecodeBitfield(bitfield)
 
+	reorderedBitField := reorderBitfield(nullValues, definitions.NewColumnOrder)
+
 	lenBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(lenBytes, rowLen)
 	flatRow = append(flatRow, lenBytes...)
-	flatRow = append(flatRow, bitfield...)
+	flatRow = append(flatRow, reorderedBitField...)
 
 	for i, width := range definitions.Widths {
 		if nullValues[i] {
@@ -107,8 +109,8 @@ func readRow(file *os.File, definitions ColumnDefinitions, newColumnOrder []uint
 
 		var rowPos uint
 
-		if newColumnOrder != nil {
-			rowPos = newColumnOrder[i] - 1
+		if definitions.NewColumnOrder != nil {
+			rowPos = definitions.NewColumnOrder[i] - 1
 		} else {
 			rowPos = uint(i)
 		}
@@ -128,6 +130,39 @@ func readRow(file *os.File, definitions ColumnDefinitions, newColumnOrder []uint
 	}
 
 	return flatRow, nil
+}
+
+func reorderBitfield(nullValues []bool, newColumnOrder []uint) []byte {
+	reorderedNullValues := make([]bool, len(nullValues))
+
+	for i, val := range newColumnOrder {
+		reorderedNullValues[i] = nullValues[val-1]
+	}
+
+	var bitfield []byte
+	sliceLen := len(reorderedNullValues)
+
+	chunkSize := 8
+
+	for i := 0; i < sliceLen; i += chunkSize {
+		var b byte
+
+		end := i + chunkSize
+
+		if end > sliceLen {
+			end = sliceLen
+		}
+
+		for i1, value := range reorderedNullValues[i:end] {
+			if value {
+				b |= 1 << int8(math.Abs(float64(i1)-7))
+			}
+		}
+
+		bitfield = append(bitfield, b)
+	}
+
+	return bitfield
 }
 
 func CountRows(inputFiles []*os.File) error {
@@ -151,18 +186,18 @@ func countRows(file *os.File) (int, error) {
 		return -1, errors.New("error reading file signature: " + err.Error())
 	}
 
-	definitions, err := ReadColumnDefinitions(file)
+	definitions, err := ReadColumnDefinitions(file, nil)
 	if err != nil {
 		return -1, errors.New("error reading column definitions: " + err.Error())
 	}
 	count := 0
 
-	_, err = readRow(file, definitions, nil)
+	_, err = readRow(file, definitions)
 
 	for err == nil {
 		count += 1
 
-		_, err = readRow(file, definitions, nil)
+		_, err = readRow(file, definitions)
 	}
 
 	if err == io.EOF {
@@ -204,7 +239,7 @@ func PrintHeader(file *os.File, writer io.Writer) error {
 		return errors.New(fmt.Sprintf("invalid file signature: %s", file.Name()))
 	}
 
-	definitions, err := ReadColumnDefinitions(file)
+	definitions, err := ReadColumnDefinitions(file, nil)
 	if err != nil {
 		return err
 	}
@@ -233,7 +268,7 @@ func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 		return errors.New(fmt.Sprintf("invalid file signature: %s", file.Name()))
 	}
 
-	definitions, err := ReadColumnDefinitions(file)
+	definitions, err := ReadColumnDefinitions(file, newColumnOrder)
 	if err != nil {
 		return err
 	}
@@ -246,7 +281,7 @@ func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 	i := 0
 
 	for i < rowsToTake {
-		row, err := readRow(file, definitions, newColumnOrder)
+		row, err := readRow(file, definitions)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -286,7 +321,7 @@ func Tail(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 		return errors.New(fmt.Sprintf("invalid file signature: %s", file.Name()))
 	}
 
-	definitions, err := ReadColumnDefinitions(file)
+	definitions, err := ReadColumnDefinitions(file, nil)
 	if err != nil {
 		return err
 	}
@@ -301,7 +336,7 @@ func Tail(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 	i := 0
 
 	for i < totalRows {
-		row, err := readRow(file, definitions, nil)
+		row, err := readRow(file, definitions)
 		if err != nil {
 			return err
 		}
