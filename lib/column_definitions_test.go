@@ -22,7 +22,7 @@ func TestReadColumnDefinitions(t *testing.T) {
 		t.Fatal("signature didn't match")
 	}
 
-	definitions, err := ReadColumnDefinitions(file)
+	definitions, err := ReadColumnDefinitions(file, nil)
 	if err != nil {
 		t.Fatal("error reading column definitions: ", err)
 	}

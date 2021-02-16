@@ -2,6 +2,7 @@ package lib
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -145,7 +146,7 @@ func TestHead(t *testing.T) {
 
 			var buf bytes.Buffer
 
-			err = Head(file, &buf, tt.args.rowsToTake, tt.args.shouldWriteMetaData)
+			err = Head(file, &buf, tt.args.rowsToTake, tt.args.shouldWriteMetaData, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Head() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -154,6 +155,67 @@ func TestHead(t *testing.T) {
 			actual := buf.Len()
 			if !reflect.DeepEqual(actual, tt.want) {
 				t.Errorf("Head() got = %v, want %v", actual, tt.want)
+			}
+		})
+	}
+}
+
+func TestHeadWithReorder(t *testing.T) {
+	tests := []struct {
+		name           string
+		fileName       string
+		rowsToTake     int
+		newColumnOrder []uint
+		expectedSize   int
+		shouldDiffer   bool
+	}{
+		{name: "5 rows, no reordering",
+			fileName:       "../test-data/sample",
+			rowsToTake:     5,
+			newColumnOrder: nil,
+			expectedSize:   1422,
+			shouldDiffer:   false},
+		{name: "5 rows, reordering",
+			fileName:       "../test-data/sample",
+			rowsToTake:     5,
+			expectedSize:   1422,
+			newColumnOrder: []uint{5, 4, 3, 2, 1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75},
+			shouldDiffer:   true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, err := os.Open(tt.fileName)
+			if err != nil {
+				t.Fatal("couldn't open file", err)
+			}
+
+			defer file.Close()
+
+			var buf bytes.Buffer
+
+			err = Head(file, &buf, tt.rowsToTake, true, tt.newColumnOrder)
+			if err != nil {
+				t.Fatal("error processing input file with reordering: ", err)
+			}
+
+			_, _ = file.Seek(0, io.SeekStart)
+
+			var origOrderBuf bytes.Buffer
+
+			err = Head(file, &origOrderBuf, tt.rowsToTake, true, nil)
+			if err != nil {
+				t.Fatal("error processing input file with original ordering: ", err)
+			}
+
+			if reflect.DeepEqual(buf, origOrderBuf) && tt.shouldDiffer {
+				t.Errorf("output should differ, but did not")
+			}
+
+			reorderedLen := buf.Len()
+
+			if reorderedLen != tt.expectedSize {
+				t.Errorf("Head() got = %v, want %v", reorderedLen, tt.expectedSize)
 			}
 		})
 	}
@@ -200,7 +262,7 @@ func TestTail(t *testing.T) {
 
 			var buf bytes.Buffer
 
-			err = Tail(file, &buf, tt.args.rowsToTake, tt.args.shouldWriteMetaData)
+			err = Tail(file, &buf, tt.args.rowsToTake, tt.args.shouldWriteMetaData, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Tail() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -210,6 +272,120 @@ func TestTail(t *testing.T) {
 
 			if !reflect.DeepEqual(actual, tt.want) {
 				t.Errorf("Tail() got = %v, want %v", actual, tt.want)
+			}
+		})
+	}
+}
+
+func TestTailWithReorder(t *testing.T) {
+	tests := []struct {
+		name           string
+		fileName       string
+		rowsToTake     int
+		newColumnOrder []uint
+		expectedSize   int
+		shouldDiffer   bool
+	}{
+		{name: "5 rows, no reordering",
+			fileName:       "../test-data/sample",
+			rowsToTake:     5,
+			newColumnOrder: nil,
+			expectedSize:   1390,
+			shouldDiffer:   false},
+		{name: "5 rows, reordering",
+			fileName:       "../test-data/sample",
+			rowsToTake:     5,
+			expectedSize:   1390,
+			newColumnOrder: []uint{5, 4, 3, 2, 1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75},
+			shouldDiffer:   true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, err := os.Open(tt.fileName)
+			if err != nil {
+				t.Fatal("couldn't open file", err)
+			}
+
+			defer file.Close()
+
+			var buf bytes.Buffer
+
+			err = Tail(file, &buf, tt.rowsToTake, true, tt.newColumnOrder)
+			if err != nil {
+				t.Fatal("error processing input file with reordering: ", err)
+			}
+
+			_, _ = file.Seek(0, io.SeekStart)
+
+			var origOrderBuf bytes.Buffer
+
+			err = Head(file, &origOrderBuf, tt.rowsToTake, true, nil)
+			if err != nil {
+				t.Fatal("error processing input file with original ordering: ", err)
+			}
+
+			if reflect.DeepEqual(buf, origOrderBuf) && tt.shouldDiffer {
+				t.Errorf("output should differ, but did not")
+			}
+
+			reorderedLen := buf.Len()
+
+			if reorderedLen != tt.expectedSize {
+				t.Errorf("Head() got = %v, want %v", reorderedLen, tt.expectedSize)
+			}
+		})
+	}
+}
+
+func TestCatWithReorder(t *testing.T) {
+	tests := []struct {
+		name           string
+		fileName       string
+		newColumnOrder []uint
+		shouldDiffer   bool
+	}{
+		{name: "no reordering, empty slice",
+			fileName:       "../test-data/all-types.bin",
+			newColumnOrder: nil,
+			shouldDiffer:   false},
+		{name: "no reordering",
+			fileName:       "../test-data/all-types.bin",
+			newColumnOrder: []uint{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
+			shouldDiffer:   false},
+		{name: "reorder",
+			fileName:       "../test-data/all-types.bin",
+			newColumnOrder: []uint{2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
+			shouldDiffer:   true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, err := os.Open(tt.fileName)
+			if err != nil {
+				t.Fatal("couldn't open file", err)
+			}
+
+			defer file.Close()
+
+			var buf bytes.Buffer
+
+			err = Cat(file, &buf, true, tt.newColumnOrder)
+			if err != nil {
+				t.Fatal("error processing input file with reordering: ", err)
+			}
+
+			_, _ = file.Seek(0, io.SeekStart)
+
+			var origOrderBuf bytes.Buffer
+
+			err = Cat(file, &origOrderBuf, true, nil)
+			if err != nil {
+				t.Fatal("error processing input file with original ordering: ", err)
+			}
+
+			if reflect.DeepEqual(buf, origOrderBuf) && tt.shouldDiffer {
+				t.Errorf("output should differ, but did not")
 			}
 		})
 	}
@@ -247,7 +423,7 @@ func TestCat(t *testing.T) {
 
 			var buf bytes.Buffer
 
-			err = Cat(file, &buf, tt.args.shouldWriteMetaData)
+			err = Cat(file, &buf, tt.args.shouldWriteMetaData, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Tail() error = %v, wantErr %v", err, tt.wantErr)
 				return

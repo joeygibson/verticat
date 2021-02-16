@@ -11,11 +11,6 @@ import (
 
 var FileSignature = []byte{0x4e, 0x41, 0x54, 0x49, 0x56, 0x45, 0x0a, 0xff, 0x0d, 0x0a, 0x00}
 
-type BinaryFileFragment struct {
-	Definitions ColumnDefinitions
-	Data        []byte
-}
-
 func ReadSignature(file *os.File) (bool, error) {
 	signature := make([]byte, len(FileSignature))
 
@@ -40,64 +35,29 @@ func ReadSignature(file *os.File) (bool, error) {
 	return match, nil
 }
 
-func (binaryFile *BinaryFileFragment) Write(file io.Writer, writeHeaders bool) error {
-	if writeHeaders {
-		_, err := file.Write(FileSignature)
-		if err != nil {
-			return err
-		}
-
-		err = binaryFile.Definitions.Write(file)
-		if err != nil {
-			return err
-		}
-	}
-	_, err := file.Write(binaryFile.Data)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-//func ProcessFile(file *os.File, outFile *os.File, countFlag bool, headRows int, tailRows int) (interface{}, error) {
-//	_, err := ReadSignature(file)
-//	if err != nil {
-//		return 0, err
-//	}
-//
-//	definitions, err := ReadColumnDefinitions(file)
-//	if err != nil {
-//		return 0, err
-//	}
-//
-//	result, err := iterateRows(file, outFile, definitions, countFlag, headRows, tailRows)
-//	if err != nil {
-//		return result, err
-//	}
-//
-//	return result, nil
-//}
-
 func readRow(file *os.File, definitions ColumnDefinitions) ([]byte, error) {
-	var row []byte
+	var flatRow []byte
+	row := make([][]byte, definitions.NumberOfColumns)
+
 	var rowLen uint32
 	err := binary.Read(file, binary.LittleEndian, &rowLen)
 	if err != nil {
-		return row, err
+		return flatRow, err
 	}
 
 	bitfield, err := ReadBitfield(file, definitions.NumberOfColumns)
 	if err != nil {
-		return row, err
+		return flatRow, err
 	}
 
 	nullValues := DecodeBitfield(bitfield)
 
+	reorderedBitField := reorderBitfield(nullValues, definitions.NewColumnOrder)
+
 	lenBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(lenBytes, rowLen)
-	row = append(row, lenBytes...)
-	row = append(row, bitfield...)
+	flatRow = append(flatRow, lenBytes...)
+	flatRow = append(flatRow, reorderedBitField...)
 
 	for i, width := range definitions.Widths {
 		if nullValues[i] {
@@ -109,7 +69,7 @@ func readRow(file *os.File, definitions ColumnDefinitions) ([]byte, error) {
 		if width == math.MaxUint32 {
 			err = binary.Read(file, binary.LittleEndian, &columnWidth)
 			if err != nil {
-				return row, err
+				return flatRow, err
 			}
 		} else {
 			columnWidth = width
@@ -119,19 +79,65 @@ func readRow(file *os.File, definitions ColumnDefinitions) ([]byte, error) {
 
 		err = binary.Read(file, binary.LittleEndian, &column)
 		if err != nil {
-			return row, err
+			return flatRow, err
+		}
+
+		var rowPos uint
+
+		if definitions.NewColumnOrder != nil {
+			rowPos = definitions.NewColumnOrder[i] - 1
+		} else {
+			rowPos = uint(i)
 		}
 
 		if width != columnWidth {
 			widthBytes := make([]byte, 4)
 			binary.LittleEndian.PutUint32(widthBytes, columnWidth)
-			row = append(row, widthBytes...)
+			row[rowPos] = widthBytes
+			row[rowPos] = append(row[rowPos], column...)
+		} else {
+			row[rowPos] = column
 		}
-
-		row = append(row, column...)
 	}
 
-	return row, nil
+	for _, column := range row {
+		flatRow = append(flatRow, column...)
+	}
+
+	return flatRow, nil
+}
+
+func reorderBitfield(nullValues []bool, newColumnOrder []uint) []byte {
+	reorderedNullValues := make([]bool, len(nullValues))
+
+	for i, val := range newColumnOrder {
+		reorderedNullValues[i] = nullValues[val-1]
+	}
+
+	var bitfield []byte
+	sliceLen := len(reorderedNullValues)
+
+	chunkSize := 8
+
+	for i := 0; i < sliceLen; i += chunkSize {
+		var b byte
+
+		end := i + chunkSize
+
+		if end > sliceLen {
+			end = sliceLen
+		}
+
+		for i1, value := range reorderedNullValues[i:end] {
+			if value {
+				b |= 1 << int8(math.Abs(float64(i1)-7))
+			}
+		}
+
+		bitfield = append(bitfield, b)
+	}
+
+	return bitfield
 }
 
 func CountRows(inputFiles []*os.File) error {
@@ -155,7 +161,7 @@ func countRows(file *os.File) (int, error) {
 		return -1, errors.New("error reading file signature: " + err.Error())
 	}
 
-	definitions, err := ReadColumnDefinitions(file)
+	definitions, err := ReadColumnDefinitions(file, nil)
 	if err != nil {
 		return -1, errors.New("error reading column definitions: " + err.Error())
 	}
@@ -189,8 +195,8 @@ func resetFilePosition(file *os.File, pos int64) error {
 	return nil
 }
 
-func Cat(file *os.File, writer io.Writer, shouldWriteMetaData bool) error {
-	err := Head(file, writer, math.MaxInt64, shouldWriteMetaData)
+func Cat(file *os.File, writer io.Writer, shouldWriteMetaData bool, newColumnOrder []uint) error {
+	err := Head(file, writer, math.MaxInt64, shouldWriteMetaData, newColumnOrder)
 	if err != nil {
 		return err
 	}
@@ -208,7 +214,7 @@ func PrintHeader(file *os.File, writer io.Writer) error {
 		return errors.New(fmt.Sprintf("invalid file signature: %s", file.Name()))
 	}
 
-	definitions, err := ReadColumnDefinitions(file)
+	definitions, err := ReadColumnDefinitions(file, nil)
 	if err != nil {
 		return err
 	}
@@ -226,7 +232,8 @@ func PrintHeader(file *os.File, writer io.Writer) error {
 	return nil
 }
 
-func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData bool) error {
+func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData bool,
+	newColumnOrder []uint) error {
 	valid, err := ReadSignature(file)
 	if err != nil {
 		return err
@@ -236,7 +243,7 @@ func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 		return errors.New(fmt.Sprintf("invalid file signature: %s", file.Name()))
 	}
 
-	definitions, err := ReadColumnDefinitions(file)
+	definitions, err := ReadColumnDefinitions(file, newColumnOrder)
 	if err != nil {
 		return err
 	}
@@ -269,7 +276,8 @@ func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 	return nil
 }
 
-func Tail(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData bool) error {
+func Tail(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData bool,
+	newColumnOrder []uint) error {
 	totalRows, err := countRows(file)
 	if err != nil {
 		return err
@@ -289,7 +297,7 @@ func Tail(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 		return errors.New(fmt.Sprintf("invalid file signature: %s", file.Name()))
 	}
 
-	definitions, err := ReadColumnDefinitions(file)
+	definitions, err := ReadColumnDefinitions(file, newColumnOrder)
 	if err != nil {
 		return err
 	}

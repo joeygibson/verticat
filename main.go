@@ -5,7 +5,10 @@ import (
 	"github.com/joeygibson/verticat/lib"
 	"github.com/pborman/getopt/v2"
 	"io"
+	"io/ioutil"
 	"os"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -23,6 +26,7 @@ func main() {
 	forceFlag := getopt.BoolLong("force", 'f', "force overwrite of output file")
 	versionFlag := getopt.BoolLong("version", 'v', "show version")
 	printHeaderFlag := getopt.BoolLong("print-header", 'p', "print out header and exit")
+	reorderFile := getopt.StringLong("reorder", 'r', "", "reorder columns based on this file")
 
 	getopt.SetParameters("[file...]")
 	getopt.Parse()
@@ -110,17 +114,39 @@ func main() {
 		output = os.Stdout
 	}
 
+	var newColumnOrder []uint
+
+	if *reorderFile != "" {
+		contents, err := ioutil.ReadFile(*reorderFile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error opening reordering file: ", err)
+			os.Exit(2)
+		}
+
+		orderingStrings := strings.Fields(strings.ReplaceAll(string(contents), ",", " "))
+
+		for _, order := range orderingStrings {
+			val, err := strconv.ParseUint(order, 10, 16)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "error converting value from reordering file: ", err)
+				os.Exit(2)
+			}
+
+			newColumnOrder = append(newColumnOrder, uint(val))
+		}
+	}
+
 	firstTime := true
 
 	for _, inputFile := range inputFiles {
 		if *headRows != 0 {
-			err := lib.Head(inputFile, output, *headRows, firstTime)
+			err := lib.Head(inputFile, output, *headRows, firstTime, newColumnOrder)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "error processing file: ", err)
 				os.Exit(1)
 			}
 		} else if *tailRows != 0 {
-			err := lib.Tail(inputFile, output, *tailRows, firstTime)
+			err := lib.Tail(inputFile, output, *tailRows, firstTime, newColumnOrder)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "error processing file: ", err)
 				os.Exit(1)
@@ -133,7 +159,7 @@ func main() {
 				os.Exit(1)
 			}
 		} else {
-			err := lib.Cat(inputFile, output, firstTime)
+			err := lib.Cat(inputFile, output, firstTime, newColumnOrder)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "error processing file: ", err)
 				os.Exit(1)
