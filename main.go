@@ -146,7 +146,7 @@ func main() {
 				os.Exit(1)
 			}
 		} else if *tailRows != 0 {
-			err := lib.Tail(inputFile, output, *tailRows, firstTime)
+			err := lib.Tail(inputFile, output, *tailRows, firstTime, newColumnOrder)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "error processing file: ", err)
 				os.Exit(1)

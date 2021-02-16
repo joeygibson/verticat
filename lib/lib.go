@@ -276,7 +276,8 @@ func Head(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 	return nil
 }
 
-func Tail(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData bool) error {
+func Tail(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData bool,
+	newColumnOrder []uint) error {
 	totalRows, err := countRows(file)
 	if err != nil {
 		return err
@@ -296,7 +297,7 @@ func Tail(file *os.File, writer io.Writer, rowsToTake int, shouldWriteMetaData b
 		return errors.New(fmt.Sprintf("invalid file signature: %s", file.Name()))
 	}
 
-	definitions, err := ReadColumnDefinitions(file, nil)
+	definitions, err := ReadColumnDefinitions(file, newColumnOrder)
 	if err != nil {
 		return err
 	}
