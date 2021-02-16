@@ -11,11 +11,6 @@ import (
 
 var FileSignature = []byte{0x4e, 0x41, 0x54, 0x49, 0x56, 0x45, 0x0a, 0xff, 0x0d, 0x0a, 0x00}
 
-type BinaryFileFragment struct {
-	Definitions ColumnDefinitions
-	Data        []byte
-}
-
 func ReadSignature(file *os.File) (bool, error) {
 	signature := make([]byte, len(FileSignature))
 
@@ -38,26 +33,6 @@ func ReadSignature(file *os.File) (bool, error) {
 	}
 
 	return match, nil
-}
-
-func (binaryFile *BinaryFileFragment) Write(file io.Writer, writeHeaders bool) error {
-	if writeHeaders {
-		_, err := file.Write(FileSignature)
-		if err != nil {
-			return err
-		}
-
-		err = binaryFile.Definitions.Write(file)
-		if err != nil {
-			return err
-		}
-	}
-	_, err := file.Write(binaryFile.Data)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func readRow(file *os.File, definitions ColumnDefinitions) ([]byte, error) {
