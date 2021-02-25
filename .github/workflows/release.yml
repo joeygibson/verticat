@@ -30,6 +30,7 @@ jobs:
         config:
           - os: ubuntu-latest
           - os: macOS-latest
+          - os: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -38,15 +39,19 @@ jobs:
         with:
           go-version: 1.15
       - name: Build for release
-        run: go build -ldflags "-X main.sha1ver=`git rev-parse HEAD` -X main.buildTime=`date +'%Y-%m-%d_%T'` -X main.gitTag=${GITHUB_REF#refs/*/v}"
+        run: go build -o ${GITHUB_REPOSITORY#joeygibson/} -ldflags "-X main.sha1ver=`git rev-parse HEAD` -X main.buildTime=`date +'%Y-%m-%d_%T'` -X main.gitTag=${GITHUB_REF#refs/*/v}"
+        shell: bash
       - name: Set program name
         run: echo "PROGRAM_NAME=${GITHUB_REPOSITORY#joeygibson/}" >> $GITHUB_ENV
+        shell: bash
       - name: Generate binary name
         run: ./scripts/generate-binary-name
+        shell: bash
         env: 
           OS: ${{ matrix.config.os }}
       - name: Set permissions
         run: chmod 755 ${{ env.PROGRAM_NAME }}
+        shell: bash
       - name: Upload release assets
         uses: actions/upload-release-asset@v1
         env:
