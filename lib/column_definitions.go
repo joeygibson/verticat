@@ -12,7 +12,6 @@ type ColumnDefinitions struct {
 	Filler          byte
 	NumberOfColumns uint16
 	Widths          []uint32
-	NewColumnOrder  []uint
 }
 
 func (c ColumnDefinitions) Write(file io.Writer) (err error) {
@@ -36,29 +35,15 @@ func (c ColumnDefinitions) Write(file io.Writer) (err error) {
 		return
 	}
 
-	if c.NewColumnOrder == nil {
-		err = binary.Write(file, binary.LittleEndian, c.Widths)
-		if err != nil {
-			return
-		}
-	} else {
-		// Re-order the column widths based on the specified order
-		orderedWidths := make([]uint32, len(c.Widths))
-
-		for i, val := range c.NewColumnOrder {
-			orderedWidths[i] = c.Widths[val - 1]
-		}
-
-		err = binary.Write(file, binary.LittleEndian, orderedWidths)
-		if err != nil {
-			return
-		}
+	err = binary.Write(file, binary.LittleEndian, c.Widths)
+	if err != nil {
+		return
 	}
 
 	return nil
 }
 
-func ReadColumnDefinitions(file *os.File, newColumnOrder []uint) (ColumnDefinitions, error) {
+func ReadColumnDefinitions(file *os.File) (ColumnDefinitions, error) {
 	var headerLength uint32
 	var version uint16
 	var filler byte
@@ -97,7 +82,6 @@ func ReadColumnDefinitions(file *os.File, newColumnOrder []uint) (ColumnDefiniti
 		Filler:          filler,
 		NumberOfColumns: numberOfColumns,
 		Widths:          widths,
-		NewColumnOrder: newColumnOrder,
 	}
 
 	return definitions, nil
