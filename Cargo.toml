@@ -1,0 +1,15 @@
+[package]
+name = "verticat"
+version = "2.0.0"
+authors = ["Joey Gibson <joey@joeygibson.com>"]
+description = "A tool to count the rows, and take rows from Vertica native binary files"
+readme = "README.md"
+repository = "https://github.com/joeygibson/verticareader"
+license = "MIT"
+keywords = ["vertica", "database", "binary"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = "3"
