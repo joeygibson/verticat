@@ -95,11 +95,11 @@ pub fn process_file(
     }
 
     if tail.is_some() {
-        native_file.drop(head.unwrap() as usize)
-            .for_each(|row| {
-                let data = row.generate_output().unwrap();
-                stdout.write_all(&data);
-            });
+        // native_file.drop(head.unwrap() as usize)
+        //     .for_each(|row| {
+        //         let data = row.generate_output().unwrap();
+        //         stdout.write_all(&data);
+        //     });
 
         return Ok(());
     }
