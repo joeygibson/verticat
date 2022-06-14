@@ -48,8 +48,8 @@ impl<'a> Iterator for VerticaNativeFile<'a> {
 
 #[derive(Debug)]
 pub struct Row {
-    null_values: Vec<bool>,
-    data: Vec<Option<Vec<u8>>>,
+    bitfield: Vec<u8>,
+    data: Vec<u8>,
 }
 
 impl Row {
@@ -57,13 +57,12 @@ impl Row {
         mut reader: impl Read,
         column_widths: &Vec<u32>,
     ) -> Result<Self, Box<dyn Error>> {
-        let mut data: Vec<Option<Vec<u8>>> = vec![];
+        let mut data: Vec<u8> = vec![];
 
-        let null_values = Row::read_bitfield(&mut reader, &column_widths)?;
+        let (null_values, bitfield) = Row::read_bitfield(&mut reader, &column_widths)?;
 
         for (index, width) in column_widths.iter().enumerate() {
             if null_values[index] {
-                data.push(None);
                 continue;
             }
 
@@ -81,16 +80,16 @@ impl Row {
                 column.push(value);
             }
 
-            data.push(Some(column));
+            data.append(&mut column)
         }
 
-        Ok(Row { null_values, data })
+        Ok(Row { bitfield, data })
     }
 
     fn read_bitfield(
         mut reader: &mut impl Read,
         column_widths: &Vec<u32>,
-    ) -> Result<Vec<bool>, Box<dyn Error>> {
+    ) -> Result<(Vec<bool>, Vec<u8>), Box<dyn Error>> {
         let mut null_values: Vec<bool> = vec![];
 
         let bitfield_length =
@@ -103,23 +102,14 @@ impl Row {
             }
         }
 
-        Ok(null_values)
+        Ok((null_values, bitfield))
     }
 
-    pub fn generate_output(
-        &self,
-        types: &ColumnTypes,
-        tz_offset: i8,
-    ) -> Result<Vec<String>, Box<dyn Error>> {
-        let mut record: Vec<String> = vec![];
+    pub fn generate_output(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut record: Vec<u8> = vec![];
 
-        for (index, column) in self.data.iter().enumerate() {
-            let column_conversion = &types.column_conversions[index];
-
-            let output =
-                types.column_types[index].format_value(column, tz_offset, column_conversion);
-            record.push(output);
-        }
+        record.append(&mut self.bitfield.clone());
+        record.append(&mut self.data.clone());
 
         Ok(record)
     }

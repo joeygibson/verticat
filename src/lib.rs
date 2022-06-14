@@ -7,6 +7,7 @@ use std::str::FromStr;
 
 use column_types::ColumnTypes;
 use vertica_native_file::VerticaNativeFile;
+use crate::vertica_native_file::Row;
 
 mod column_conversion;
 mod column_definitions;
@@ -78,9 +79,30 @@ pub fn process_file(
 
     if count {
         println!("{} {}", native_file.count(), input);
+        return Ok(());
     }
 
+    let mut stdout = io::stdout().lock();
 
+    if head.is_some() {
+        native_file.take(head.unwrap() as usize)
+            .for_each(|row| {
+                let data = row.generate_output().unwrap();
+                stdout.write_all(&data);
+            });
+
+        return Ok(());
+    }
+
+    if tail.is_some() {
+        native_file.drop(head.unwrap() as usize)
+            .for_each(|row| {
+                let data = row.generate_output().unwrap();
+                stdout.write_all(&data);
+            });
+
+        return Ok(());
+    }
 
     return Ok(());
 }
