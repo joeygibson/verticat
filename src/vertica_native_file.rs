@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 
 use crate::column_definitions::ColumnDefinitions;
 use crate::column_types::ColumnTypes;
@@ -36,7 +36,7 @@ impl<'a> Iterator for VerticaNativeFile<'a> {
             return None;
         }
 
-        match Row::from_reader(self.file, &self.definitions.column_widths) {
+        match Row::from_reader(self.file, row_length, &self.definitions.column_widths) {
             Ok(row) => Some(row),
             Err(e) => {
                 eprintln!("reading data: {}", e);
@@ -48,6 +48,7 @@ impl<'a> Iterator for VerticaNativeFile<'a> {
 
 #[derive(Debug)]
 pub struct Row {
+    length: u32,
     bitfield: Vec<u8>,
     data: Vec<u8>,
 }
@@ -55,6 +56,7 @@ pub struct Row {
 impl Row {
     fn from_reader(
         mut reader: impl Read,
+        length: u32,
         column_widths: &Vec<u32>,
     ) -> Result<Self, Box<dyn Error>> {
         let mut data: Vec<u8> = vec![];
@@ -83,7 +85,7 @@ impl Row {
             data.append(&mut column)
         }
 
-        Ok(Row { bitfield, data })
+        Ok(Row { length, bitfield, data })
     }
 
     fn read_bitfield(

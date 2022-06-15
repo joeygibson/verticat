@@ -95,14 +95,29 @@ pub fn process_file(
     }
 
     if tail.is_some() {
-        // native_file.drop(head.unwrap() as usize)
-        //     .for_each(|row| {
-        //         let data = row.generate_output().unwrap();
-        //         stdout.write_all(&data);
-        //     });
+        let rows = native_file.count();
+
+        let mut input_file = match File::open(&input) {
+            Ok(i) => i,
+            Err(e) => return Err(e.to_string()),
+        };
+
+        let native_file = match VerticaNativeFile::from_reader(&mut input_file) {
+            Ok(i) => i,
+            Err(e) => return Err(e.to_string()),
+        };
+
+        let rows_to_skip = rows - (tail.unwrap() as usize);
+
+        native_file.skip(rows_to_skip)
+            .for_each(|row| {
+                let data = row.generate_output().unwrap();
+                stdout.write_all(&data);
+            });
 
         return Ok(());
     }
 
     return Ok(());
 }
+
