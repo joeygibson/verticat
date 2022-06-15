@@ -67,7 +67,7 @@ mod tests {
     fn test_good_input() {
         use std::fs::File;
 
-        let file = File::open("data/all-valid-types.txt").unwrap();
+        let file = File::open("test-data/all-valid-types.txt").unwrap();
 
         let expected_types = vec![
             Integer,
@@ -96,7 +96,7 @@ mod tests {
     fn test_invalid_input() {
         use std::fs::File;
 
-        let file = File::open("data/types-with-one-invalid.txt").unwrap();
+        let file = File::open("test-data/types-with-one-invalid.txt").unwrap();
 
         ColumnTypes::from_reader(file).unwrap();
     }

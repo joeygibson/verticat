@@ -632,7 +632,7 @@ mod tests {
         }
 
         // TODO: I need to think more about how to test this one. It does work
-        // correctly against `data/all-types.bin`.
+        // correctly against `test-data/all-types.bin`.
         // #[test]
         // fn test_timetz() {
         //     let column_type = ColumnType::TimeTz;

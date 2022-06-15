@@ -125,23 +125,23 @@ mod tests {
 
     #[test]
     fn test_read_from_good_file() {
-        let mut file = File::open("data/all-types.bin").unwrap();
+        let mut file = File::open("test-data/all-types.bin").unwrap();
 
         let file = VerticaNativeFile::from_reader(&mut file).unwrap();
 
         for row in file {
-            assert_eq!(14, row.data.len());
+            assert_eq!(107, row.data.len());
         }
     }
 
     #[test]
     fn test_read_from_good_file_with_nulls() {
-        let mut file = File::open("data/all-types-with-nulls.bin").unwrap();
+        let mut file = File::open("test-data/all-types-with-nulls.bin").unwrap();
 
         let file = VerticaNativeFile::from_reader(&mut file).unwrap();
 
         for row in file {
-            assert_eq!(14, row.data.len());
+            assert_eq!(99, row.data.len());
         }
     }
 }
