@@ -5,7 +5,6 @@ use verticat::process_file;
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 const COUNT: &'static str = "count";
-const FORCE: &'static str = "force";
 const HEAD: &'static str = "head";
 const INPUT: &'static str = "input";
 const TAIL: &'static str = "tail";
@@ -30,13 +29,6 @@ fn main() {
                 .help("count rows"),
         )
         .arg(
-            Arg::new(FORCE)
-                .takes_value(false)
-                .short('f')
-                .long(FORCE)
-                .help("force overwrite of output file"),
-        )
-        .arg(
             Arg::new(HEAD)
                 .takes_value(true)
                 .short('h')
@@ -57,7 +49,6 @@ fn main() {
 
     let input: Vec<&str> = args.values_of(INPUT).unwrap().collect();
     let count = args.is_present(COUNT);
-    let force = args.is_present(FORCE);
     let head = get_param(&args, HEAD);
     let tail = get_param(&args, TAIL);
 
@@ -67,7 +58,7 @@ fn main() {
     }
 
     for filename in input {
-        match process_file(filename, count, head, tail, force) {
+        match process_file(filename, count, head, tail) {
             Ok(_) => {}
             Err(e) => eprintln!("Error: {}", e),
         }

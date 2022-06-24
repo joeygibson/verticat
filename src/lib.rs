@@ -1,13 +1,10 @@
 use std::error::Error;
 use std::fs::File;
 use std::io;
-use std::io::{stdout, BufWriter, Read, Write};
+use std::io::{Read, Write};
 use std::path::Path;
-use std::str::FromStr;
 
-use column_types::ColumnTypes;
 use vertica_native_file::VerticaNativeFile;
-use crate::vertica_native_file::Row;
 
 mod column_conversion;
 mod column_definitions;
@@ -56,13 +53,7 @@ pub fn process_file(
     count: bool,
     head: Option<i32>,
     tail: Option<i32>,
-    force: bool,
 ) -> Result<(), String> {
-    println!(
-        "input: {:?}, count: {}, head: {:?}, tail: {:?}, force: {}",
-        input, count, head, tail, force
-    );
-
     if !Path::new(input).exists() {
         return Err(format!("input file {} does not exist", input));
     }
@@ -77,6 +68,7 @@ pub fn process_file(
         Err(e) => return Err(e.to_string()),
     };
 
+    // `--count`
     if count {
         println!("{} {}", native_file.count(), input);
         return Ok(());
@@ -84,16 +76,19 @@ pub fn process_file(
 
     let mut stdout = io::stdout().lock();
 
+    // `--head n`
     if head.is_some() {
-        native_file.take(head.unwrap() as usize)
-            .for_each(|row| {
-                let data = row.generate_output().unwrap();
-                stdout.write_all(&data);
-            });
+        stdout.write_all(&native_file.generate_output().unwrap()).unwrap();
+
+        native_file.take(head.unwrap() as usize).for_each(|row| {
+            let data = row.generate_output().unwrap();
+            stdout.write_all(&data).unwrap();
+        });
 
         return Ok(());
     }
 
+    // `--tail n`
     if tail.is_some() {
         let rows = native_file.count();
 
@@ -109,15 +104,13 @@ pub fn process_file(
 
         let rows_to_skip = rows - (tail.unwrap() as usize);
 
-        native_file.skip(rows_to_skip)
-            .for_each(|row| {
-                let data = row.generate_output().unwrap();
-                stdout.write_all(&data);
-            });
+        native_file.skip(rows_to_skip).for_each(|row| {
+            let data = row.generate_output().unwrap();
+            stdout.write_all(&data).unwrap();
+        });
 
         return Ok(());
     }
 
     return Ok(());
 }
-

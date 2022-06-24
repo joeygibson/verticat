@@ -1,5 +1,5 @@
+use std::error::Error;
 use std::fs::File;
-use std::io::Result;
 
 use crate::{read_u16, read_u32, read_u8};
 
@@ -7,18 +7,18 @@ use crate::{read_u16, read_u32, read_u8};
 pub struct ColumnDefinitions {
     header_length: u32,
     version: u16,
-    // filler
+    filler: u8,
     number_of_columns: u16,
     pub column_widths: Vec<u32>,
 }
 
 impl ColumnDefinitions {
-    pub fn from_reader(reader: &mut File) -> Result<Self> {
+    pub fn from_reader(reader: &mut File) -> Result<Self, Box<dyn Error>> {
         let header_length: u32 = read_u32(reader)?;
         let version = read_u16(reader)?;
 
         // drop the filler
-        read_u8(reader)?;
+        let filler = read_u8(reader)?;
 
         let number_of_columns = read_u16(reader)?;
 
@@ -32,9 +32,30 @@ impl ColumnDefinitions {
         Ok(ColumnDefinitions {
             header_length,
             version,
+            filler,
             number_of_columns,
             column_widths,
         })
+    }
+
+    pub fn generate_output(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut record: Vec<u8> = vec![];
+
+        record.append(&mut self.header_length.to_le_bytes().to_vec());
+        record.append(&mut self.version.to_le_bytes().to_vec());
+        record.append(&mut self.filler.to_le_bytes().to_vec());
+        record.append(&mut self.number_of_columns.to_le_bytes().to_vec());
+
+        let mut width_bytes: Vec<u8> = self
+            .column_widths
+            .iter()
+            .flat_map(|bucket| bucket.to_le_bytes().to_vec())
+            .collect();
+
+        eprintln!("width_bytes: {}", &width_bytes.len());
+        record.append(&mut width_bytes);
+
+        Ok(record)
     }
 }
 
@@ -42,8 +63,9 @@ impl ColumnDefinitions {
 mod tests {
     // use std::io::{Seek, SeekFrom};
 
-    use crate::column_definitions::ColumnDefinitions;
     use std::io::{Seek, SeekFrom};
+
+    use crate::column_definitions::ColumnDefinitions;
 
     #[test]
     fn test_read_from_good_file() {

@@ -1,9 +1,8 @@
 use std::error::Error;
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read};
 
 use crate::column_definitions::ColumnDefinitions;
-use crate::column_types::ColumnTypes;
 use crate::file_signature::FileSignature;
 use crate::{read_u32, read_u8, read_variable};
 
@@ -23,6 +22,15 @@ impl<'a> VerticaNativeFile<'a> {
             definitions,
             file: reader,
         })
+    }
+
+    pub fn generate_output(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut record: Vec<u8> = vec![];
+
+        record.append(&mut self._signature.generate_output()?);
+        record.append(&mut self.definitions.generate_output()?);
+
+        Ok(record)
     }
 }
 

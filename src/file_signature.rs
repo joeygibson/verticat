@@ -44,6 +44,14 @@ impl FileSignature {
 
         Ok(FileSignature { data })
     }
+
+    pub fn generate_output(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut record: Vec<u8> = vec![];
+
+        record.append(&mut self.data.to_vec());
+
+        Ok(record)
+    }
 }
 
 fn validate(data: &[u8; 11]) -> Result<(), Box<dyn Error>> {

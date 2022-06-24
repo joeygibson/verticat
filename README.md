@@ -20,7 +20,6 @@ ARGS:
 
 OPTIONS:
     -c, --count       count rows
-    -f, --force       force overwrite of output file
     -h, --head <n>    take the first n rows
         --help        Print help information
     -t, --tail <n>    take the last n rows
